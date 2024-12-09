@@ -7,7 +7,8 @@ import numpy as np
 
 
 class TaskType(Enum):
-    multi = auto()
+    mult = auto()
+    div = auto()
     add = auto()
 
 
@@ -16,14 +17,22 @@ class Task:
     task: str
 
     def __str__(self):
-        self.task = self.task
         return self.task
 
 
+@dataclass
 class TaskGenerator:
+    
+    min_bound: int
+    max_bound: int
+
+    def getoperator(self) -> str:
+        pass
 
     def gettask(self) -> Task:
-        pass
+        first = np.random.randint(self.min_bound, self.max_bound)
+        second = np.random.randint(self.min_bound, self.max_bound)
+        return self.print_row(f'{first} {self.getoperator()} {second}')
 
     def print_row(self, left: str):
         return '{:<8} = ____'.format(left)
@@ -31,6 +40,8 @@ class TaskGenerator:
 
 class AddTaskGenerator(TaskGenerator):
 
+    def getoperator(self):
+        return "+"
     def gettask(self) -> Task:
         first = np.random.randint(20)
         second = np.random.randint(20)
@@ -38,11 +49,17 @@ class AddTaskGenerator(TaskGenerator):
 
 
 class MultiTaskGenerator(TaskGenerator):
+    def getoperator(self):
+        return "*"
 
     def gettask(self) -> Task:
-        first = np.random.randint(1, 12)
-        second = np.random.randint(1, 12)
+        first = np.random.randint(self.min_bound, self.max_bound)
+        second = np.random.randint(self.min_bound, self.max_bound)
         return self.print_row(f'{first} * {second}')
+
+class DivTaskGenerator(TaskGenerator):
+    def getoperator(self):
+        return "/"
 
 
 @dataclass
@@ -114,11 +131,13 @@ class MdWriter(Writer):
         print("")
 
 
-def get_task_generator(task_type: TaskType):
+def get_task_generator(task_type: TaskType, min_bound:int, max_bound:int):
     if task_type == TaskType.add:
-        return AddTaskGenerator()
-    elif task_type == TaskType.multi:
-        return MultiTaskGenerator()
+        return AddTaskGenerator(min_bound=min_bound, max_bound=max_bound)
+    elif task_type == TaskType.mult:
+        return MultiTaskGenerator(min_bound=min_bound, max_bound=max_bound)
+    elif task_type == TaskType.div:
+        return DivTaskGenerator(min_bound=min_bound, max_bound=max_bound)
     else:
         raise ValueError(f'Invalid task type: {task_type}')
 
@@ -135,14 +154,16 @@ def get_writer(out_format: OutFormat):
 def main():
     parser = argparse.ArgumentParser('Generate math tasks')
     parser.add_argument('--title', default='Math tasks')
-    parser.add_argument('--nrows', type=int, default=20, help='Number of rows')
+    parser.add_argument('--nrows', type=int, default=30, help='Number of rows')
     parser.add_argument(
         '--ncols',
         type=int,
-        default=3,
+        default=4,
         help='Number of columns'
     )
     parser.add_argument('--tasktype', type=lambda x: TaskType[x])
+    parser.add_argument('--min', type=int, default=1)
+    parser.add_argument('--max', type=int, default=20)
     parser.add_argument(
         '--format',
         type=lambda x: OutFormat[x],
@@ -150,13 +171,19 @@ def main():
     )
     args = parser.parse_args()
 
-    np.random.seed(1)
+    # np.random.seed(1)
 
     num_rows = args.nrows
     num_cols = args.ncols
     num_tasks = num_rows * num_cols
 
-    builder = TaskBuilder(task_generator=get_task_generator(args.tasktype))
+    builder = TaskBuilder(
+        task_generator=get_task_generator(
+            args.tasktype,
+            min_bound=args.min,
+            max_bound=args.max,
+        ),
+    )
     tasks: list[str] = builder.buildtasks(num_tasks)
     out = np.array(tasks).reshape(int(len(tasks) / num_cols), num_cols)
 
